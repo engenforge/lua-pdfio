@@ -1,0 +1,309 @@
+lua-pdfio(3)
+
+# NAME
+
+lua-pdfio - Lua wrapper for the pdfio library
+
+# SYNOPSIS
+
+```
+local pdfio = require("lua-pdfio")
+```
+
+# DESCRIPTION
+
+*lua-pdfio* is a Lua module that provides an interface to the *pdfio* library for
+reading and writing PDF files. Most functions map directly onto their pdfio C
+counterparts; see *pdfio*(3) for the underlying semantics.
+
+# MODULE FUNCTIONS
+
+*pdfio.open(filename [, password])*
+	Opens an existing PDF file. Returns a *file* object or *nil, err*.
+
+*pdfio.create(filename [, version])*
+	Creates a new PDF file. *version* defaults to "1.7". Returns a *file*
+	object or *nil, err*.
+
+*pdfio.create_output(callback [, version])*
+	Creates a PDF file streamed through a Lua *callback(data)* function,
+	called for each chunk of output. Useful for building a PDF entirely
+	in memory. Returns a *file* object or *nil, err*.
+
+*pdfio.create_temporary([version])*
+	Creates a PDF file backed by a unique temporary file. Returns a
+	*file* object and the temporary filename, or *nil, err*.
+
+*pdfio.array_create(pdf)*
+	Creates a new PDF array associated with the given *pdf* file.
+
+*pdfio.create_icc_obj_from_file(pdf, filename, num_colors)*,
+*pdfio.create_icc_obj_from_data(pdf, data, num_colors)*
+	Creates an ICC color profile object from a file or in-memory data.
+
+*pdfio.create_color_from_icc_obj(pdf, icc_obj)*,
+*pdfio.create_color_from_standard(pdf, num_colors, cs)*,
+*pdfio.create_color_from_palette(pdf, num_colors, colors)*,
+*pdfio.create_color_from_matrix(pdf, num_colors, gamma, matrix, white_point)*,
+*pdfio.create_color_from_primaries(pdf, num_colors, gamma, wx, wy, rx, ry, gx, gy, bx, by)*
+	Create a PDF color space array: ICC-based, standard (*cs* is one of
+	*pdfio.CS_ADOBE*, *pdfio.CS_P3_D65*, *pdfio.CS_SRGB*, or
+	*pdfio.CS_CGATS001*), indexed palette, calibrated matrix, or
+	primaries-based, respectively. *matrix* is a 3x3 table and
+	*white_point* a 3-element table for the matrix variant.
+
+All of the functions above are also available as *file:*_name_(...)
+methods (dropping the leading *pdf* argument), e.g.
+*pdf:create_color_from_standard(3, pdfio.CS_SRGB)*.
+
+# FILE METHODS
+
+*file:close()*
+	Closes the PDF file.
+
+*file:get_num_pages()*
+	Returns the number of pages in the PDF.
+
+*file:get_page(n)*
+	Returns the *obj* for page *n* (0-indexed).
+
+*file:create_page([dict])*
+	Creates a new page and returns its *stream*.
+
+*file:find_obj(number)*
+	Looks up an existing indirect object by its object number.
+
+*file:copy_obj(src_obj)*
+	Copies an object from another *file* into this one, returning the
+	new object.
+
+*file:copy_page(src_page)*
+	Copies a page object from another *file* into this one.
+
+*file:get_permissions()*
+	Returns *permissions, encryption* for an encrypted file.
+
+*file:set_permissions(permissions, encryption, owner_password, user_password)*
+	Enables encryption on a file being created, with the given
+	permission bits (*pdfio.PERMISSION_PRINT*, *pdfio.PERMISSION_COPY*,
+	etc.) and encryption mode (*pdfio.ENCRYPTION_AES_128*, etc.).
+
+*file:dict_create()*
+	Creates a new PDF dictionary associated with this file.
+
+*file:create_array_obj(array)*, *file:create_name_obj(name)*,
+*file:create_number_obj(num)*, *file:create_string_obj(s)*,
+*file:create_obj(dict)*
+	Low-level helpers to wrap a value as a standalone indirect object.
+
+*file:create_font_obj_from_base(name)*
+	Creates a font object from one of the 14 standard PDF base fonts
+	(e.g. "Helvetica", "Courier").
+
+*file:create_font_obj_from_data(data, unicode)*
+	Embeds a font from in-memory TrueType/OpenType data, without
+	touching the filesystem.
+
+*file:create_image_obj_from_file(filename, interpolate)*
+	Creates an image object from a JPEG or PNG file.
+
+*file:create_image_obj_from_data(data, width, height, num_colors,
+color_data, alpha, interpolate)*
+	Embeds an image from an in-memory raw pixel buffer, without
+	touching the filesystem. *data* must be at least
+	*width* * *height* * (*num_colors* + (*alpha* and 1 or 0)) bytes.
+
+*file:get_author()*, *file:get_title()*, *file:get_version()*, etc.
+	Standard metadata getters.
+
+*file:set_author(v)*, *file:set_title(v)*, *file:set_creator(v)*,
+*file:set_subject(v)*, *file:set_keywords(v)*
+	Standard metadata setters.
+
+*file:get_language()*, *file:set_language(v)*
+	Get/set the document language (*/Lang*).
+
+*file:get_id()*, *file:get_name()*
+	Return the trailer *ID* array and the file's name, respectively.
+
+*file:set_creation_date(t)*, *file:set_modification_date(t)*
+	Set timestamps (Unix time).
+
+*file:add_output_intent(subtype, condition, cond_id, reg_name, info,
+profile)*
+	Adds an OutputIntent dictionary to the file catalog.
+
+*file:string_create(s)*
+	Interns a string in the file's string pool, returning it unchanged.
+
+# OBJECT METHODS
+
+*obj:get_type()*
+	Returns the object type string (e.g., "Page", "Catalog").
+
+*obj:get_subtype()*
+	Returns the object's sub-type name (e.g., "Image" for an image
+	XObject).
+
+*obj:get_dict()*
+	Returns the *dict* associated with the object.
+
+*obj:get_rect(key)*
+	Returns a rectangle table (*x1, y1, x2, y2*) for a rectangle-valued
+	dictionary key, such as "MediaBox".
+
+*obj:get_number()*, *obj:get_generation()*
+	Return the object's number and generation, as used by
+	*file:find_obj()*.
+
+*obj:get_length()*
+	Returns the length of the object's data stream, if any.
+
+*obj:get_name()*
+	Returns the object's name, for Name-type objects.
+
+*obj:get_num_streams()*
+	Returns the number of content streams for a page object.
+
+*obj:open_page_stream(n, decode)*
+	Opens a page's *n*th content stream for reading.
+
+*obj:open_stream(decode)*
+	Opens a non-page object's data stream for reading.
+
+*obj:create_stream([filter])*
+	Creates a writable data stream for the object, optionally applying
+	a compression *filter* (*pdfio.FILTER_FLATE*, etc.).
+
+*obj:image_get_width()*, *obj:image_get_height()*,
+*obj:image_get_bytes_per_line()*
+	Return dimensions of an image object.
+
+*obj:text_measure(s, size)*
+	Measures the width of string *s* at point *size* when set in this
+	font object.
+
+*obj:close()*
+	Closes the object (e.g. finishes writing its stream).
+
+# DICTIONARY METHODS
+
+*dict[key]*
+	Retrieves a value from the dictionary.
+
+*dict:keys()*
+	Returns a table containing all keys in the dictionary.
+
+*dict:iterate_keys(fn)*
+	Calls *fn(key)* for each key; stops early if *fn* returns *false*.
+
+*dict:set_number(key, val)*, *dict:set_string(key, val)*, etc.
+	Sets values in the dictionary.
+
+*dict:add_font(name, font_obj)*, *dict:add_image(name, image_obj)*,
+*dict:add_color_space(name, array)*
+	Register a font, image, or color space object as a named page
+	resource.
+
+*dict:copy(pdf)*, *dict:clear(key)*
+	Copies the dictionary into another file, or removes a key.
+
+# ARRAY METHODS
+
+*array[n]*
+	Retrieves the *n*th element (1-indexed).
+
+*#array*
+	Returns the number of elements in the array.
+
+*array:append_number(val)*, *array:append_string(val)*,
+*array:append_boolean(val)*, *array:append_date(val)*,
+*array:append_name(val)*, *array:append_binary(val)*,
+*array:append_array(val)*, *array:append_dict(val)*,
+*array:append_obj(val)*
+	Append a value of the corresponding type to the array.
+
+*array:remove(n)*
+	Removes the *n*th element (1-indexed).
+
+*array:copy(pdf)*
+	Copies the array into another file, returning the new array.
+
+# STREAM METHODS
+
+*stream:read([amt])*
+	Reads data from the stream.
+
+*stream:write(data)*
+	Writes data to the stream.
+
+*stream:puts(s)*, *stream:putchar(ch)*
+	Write raw, unformatted data to the stream.
+
+*stream:peek([amt])*, *stream:consume(bytes)*
+	Look ahead in the stream without advancing, or skip bytes.
+
+*stream:get_token()*
+	Reads the next whitespace-delimited PDF content token.
+
+*stream:close()*
+	Closes the stream.
+
+*stream:draw_image(name, x, y, w, h)*
+	Draws a named image resource at the given position and size.
+
+*stream:text_begin()*, *stream:text_end()*, *stream:text_show(unicode, s)*
+	Text drawing functions.
+
+*stream:set_text_font(name, size)*, *stream:set_text_matrix(m)*,
+*stream:set_text_word_spacing(spacing)*, *stream:set_text_character_spacing(spacing)*,
+*stream:set_text_leading(leading)*, *stream:set_text_rendering_mode(mode)*,
+*stream:set_text_rise(rise)*, *stream:set_text_x_scaling(percent)*
+	Text state setters.
+
+*stream:text_move_to(tx, ty)*, *stream:text_move_line(tx, ty)*,
+*stream:text_new_line()*, *stream:text_next_line()*,
+*stream:text_show_justified(unicode, fragments)*,
+*stream:text_new_line_show(ws, cs, unicode, s)*
+	Additional text positioning and drawing functions.
+
+*stream:path_rect(x, y, w, h)*, *stream:path_move_to(x, y)*,
+*stream:path_line_to(x, y)*, *stream:path_curve(x1, y1, x2, y2, x3, y3)*,
+*stream:path_curve13(x1, y1, x3, y3)*, *stream:path_curve23(x2, y2, x3, y3)*,
+*stream:path_close()*, *stream:path_end()*
+	Path construction functions. *path_curve13* omits the second control
+	point (coincident with the endpoint); *path_curve23* omits the first
+	control point (coincident with the current point).
+
+*stream:stroke()*, *stream:fill(even_odd)*,
+*stream:fill_and_stroke(even_odd)*, *stream:clip(even_odd)*
+	Path painting functions.
+
+*stream:save()*, *stream:restore()*
+	Save/restore the graphics state.
+
+*stream:set_dash_pattern(phase, on, off)*, *stream:set_line_cap(cap)*,
+*stream:set_line_join(join)*, *stream:set_line_width(w)*,
+*stream:set_miter_limit(limit)*, *stream:set_flatness(f)*
+	Line and path style setters.
+
+*stream:set_fill_color_device_gray(g)*, etc., and matching
+*set_stroke_color_device_\** variants, plus
+*set_fill_color_space(name)* / *set_stroke_color_space(name)*
+	Fill and stroke color setters (DeviceGray/DeviceRGB/DeviceCMYK and
+	named color spaces).
+
+*stream:matrix_concat(m)*, *stream:matrix_rotate(degrees)*,
+*stream:matrix_scale(sx, sy)*, *stream:matrix_translate(tx, ty)*
+	Current transformation matrix operations.
+
+*stream:begin_marked(tag [, dict])*, *stream:end_marked()*
+	Author tagged (marked) content for accessibility.
+
+# SEE ALSO
+
+*pdfio*(3)
+
+# AUTHOR
+
+Jason Lenz <code@engenforge.com>
